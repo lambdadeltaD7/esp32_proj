@@ -1,3 +1,4 @@
+#include "HardwareSerial.h"
 #include "esp32-hal-gpio.h"
 #include <Arduino.h>
 #include <cmath>
@@ -24,6 +25,13 @@ char G_CLR_STR[8] = "Green";
 char B_CLR_STR[8] = "Blue";
 char BAD_CLR__[8]   = "ERROR";
 
+
+inline void sep(char c, int n){
+    for(int i=0; i<n; ++i){
+        Serial.print(c);
+    }
+    Serial.print('\n');
+}
 
 char* clr2cstr(int clr){
     switch(clr){
@@ -113,7 +121,9 @@ void led_cycle(){
 
 
 void loop()
-{   
-    Serial.println("Another loop iteration\n");
+{      
+    sep('#',32);
+    Serial.println("Another loop iteration");
+    Serial.printf("Uptime: %dms\n\n", millis());
     led_cycle();
 }
