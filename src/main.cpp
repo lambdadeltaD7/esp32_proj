@@ -58,7 +58,8 @@ enum class IRKeys{
     kdown,
     kleft,
     kright,
-    kERROR
+    kERROR,
+    kNONE
 };
 
 
@@ -79,12 +80,14 @@ char kup_str[8] = "UP";
 char kdown_str[8] = "DOWN";
 char kleft_str[8] = "LEFT";
 char kright_str[8] = "RIGHT";
+char kNONE_str[8] = "NONE";
 char kERROR_str[8] = "ERROR";
 
 IRKeys LAST_PRESSED_KEY = IRKeys::kERROR;
 unsigned long LAST_PRESSED_KEY_TS = 0;
 
 IRKeys cmd2key(uint16_t command){
+    // Serial.println("cmd2key()");
     switch(command){
         case 25: return IRKeys::k0;
         case 69: return IRKeys::k1;
@@ -103,12 +106,15 @@ IRKeys cmd2key(uint16_t command){
         case 82: return IRKeys::kdown;
         case 8: return IRKeys::kleft;
         case 90: return IRKeys::kright;
+        case 0: return IRKeys::kNONE;
+        default: return IRKeys::kERROR;
     }
 } 
 
 
 
 char* key2cstr(IRKeys key){
+    // Serial.println("key2cstr()");
     switch(key){
         case IRKeys::k0: return k0_str;
         case IRKeys::k1: return k1_str;
@@ -127,6 +133,7 @@ char* key2cstr(IRKeys key){
         case IRKeys::kdown: return kdown_str;
         case IRKeys::kleft: return kleft_str;
         case IRKeys::kright: return kright_str;
+        case IRKeys::kNONE: return kNONE_str;
         case IRKeys::kERROR: return kERROR_str;
     }
 }
@@ -142,6 +149,7 @@ inline void sep(char c, int n){
 }
 
 char* clr2cstr(int clr){
+    // Serial.println("clr2cstr()");
     switch(clr){
         case R_PIN:
             return R_CLR_STR;
@@ -192,6 +200,7 @@ void setup()
 
 
 void display_show_led_info(char* curr_clr, int curr_dur){
+    // Serial.println("display_show_led_info()");
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(0, 0);
@@ -210,6 +219,7 @@ void display_show_led_info(char* curr_clr, int curr_dur){
 
 
 void display_show_ir_info(){
+    // Serial.println("display_show_ir_info()");
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(0, 0);
@@ -228,6 +238,7 @@ void display_show_ir_info(){
 
 
 void refresh_display(char* curr_clr, int curr_dur){
+    // Serial.println("refresh_display()");
     display.clearDisplay();
 
     switch (CURR_DISPLAY_STATE) {
@@ -249,6 +260,7 @@ void led_cycle(){
         return;
     }
 
+    // Serial.println("    led_cycle()");
     digitalWrite(EVENTS[EVENT_IX].color, LOW);
     Serial.printf("    KILLED %s\n", clr2cstr(EVENTS[EVENT_IX].color));
     EVENT_IX = (EVENT_IX + 1) % CYCLE_LEN;
@@ -261,6 +273,7 @@ void led_cycle(){
 
 
 void switch_display_mode(){
+    // Serial.println("switch_display_mode()");
     switch(CURR_DISPLAY_STATE){
         case DisplayState::IR_INFO:
             CURR_DISPLAY_STATE = DisplayState::LED_INFO;
@@ -274,12 +287,15 @@ void switch_display_mode(){
 
 
 void handle_key_press(IRKeys key){
+    // Serial.println("handle_key_press()");
     switch (key) {
         case IRKeys::kleft:
             [[fallthrough]];
         case IRKeys::kright:
             switch_display_mode();
             Serial.println("switching display mode...");
+            return;
+        case IRKeys::kNONE:
             return;
     }
 
