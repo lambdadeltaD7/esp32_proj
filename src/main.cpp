@@ -13,7 +13,7 @@
 #define R_PIN 16
 #define G_PIN 17
 #define B_PIN 18
-int PREV_ACTIVE = -1;
+// int PREV_ACTIVE = -1;
 
 
 #define SCREEN_WIDTH 128
@@ -64,6 +64,8 @@ event EVENTS[CYCLE_LEN] = {
     {G_PIN, 2504},
     {B_PIN, 2505}
 };
+int EVENT_IX;
+unsigned long EVENT_STARTED_AT;
 
 void setup()
 {   
@@ -81,6 +83,10 @@ void setup()
     pinMode(R_PIN, OUTPUT);
     pinMode(G_PIN, OUTPUT);
     pinMode(B_PIN, OUTPUT);
+
+    EVENT_IX = 0;
+    digitalWrite(EVENTS[EVENT_IX].color, HIGH);
+    EVENT_STARTED_AT = millis();
 }
 
 
@@ -106,31 +112,44 @@ void refresh_display(char* curr_clr, int curr_dur){
 }
 
 
+// void led_cycle(){
+//     Serial.println("Entered led_cycle\n");
+//     for(int i=0; i<CYCLE_LEN; ++i){
+//         Serial.printf("    cycle iteration %d/%d\n", i+1, CYCLE_LEN);
+//         if(PREV_ACTIVE != -1){
+//             digitalWrite(PREV_ACTIVE, LOW);
+//         }
+//         Serial.printf("    KILLED %s\n", clr2cstr(PREV_ACTIVE));
+//         digitalWrite(EVENTS[i].color, HIGH);
+//         Serial.printf("    STARTED %s\n", clr2cstr(EVENTS[i].color));
+//         Serial.printf("    SLEEP FOR %d\n\n", EVENTS[i].dur);
+//         PREV_ACTIVE = EVENTS[i].color;
+//         refresh_display(clr2cstr(EVENTS[i].color), EVENTS[i].dur);
+//         delay(EVENTS[i].dur);
+//     }
+//     Serial.println("Exited led_cycle\n\n");
+// }
+
+
 void led_cycle(){
-    Serial.println("Entered led_cycle\n");
-    for(int i=0; i<CYCLE_LEN; ++i){
-        Serial.printf("    cycle iteration %d/%d\n", i+1, CYCLE_LEN);
-        if(PREV_ACTIVE != -1){
-            digitalWrite(PREV_ACTIVE, LOW);
-        }
-        Serial.printf("    KILLED %s\n", clr2cstr(PREV_ACTIVE));
-        digitalWrite(EVENTS[i].color, HIGH);
-        Serial.printf("    STARTED %s\n", clr2cstr(EVENTS[i].color));
-        Serial.printf("    SLEEP FOR %d\n\n", EVENTS[i].dur);
-        PREV_ACTIVE = EVENTS[i].color;
-        refresh_display(clr2cstr(EVENTS[i].color), EVENTS[i].dur);
-        delay(EVENTS[i].dur);
+    if(millis() - EVENT_STARTED_AT < EVENTS[EVENT_IX].dur){
+        return;
     }
-    Serial.println("Exited led_cycle\n\n");
+
+    digitalWrite(EVENTS[EVENT_IX].color, LOW);
+    Serial.printf("    KILLED %s\n", clr2cstr(EVENTS[EVENT_IX].color));
+    EVENT_IX = (EVENT_IX + 1) % CYCLE_LEN;
+    digitalWrite(EVENTS[EVENT_IX].color, HIGH);
+    EVENT_STARTED_AT = millis();
+    Serial.printf("    STARTED %s\n", clr2cstr(EVENTS[EVENT_IX].color));
+    Serial.printf("    SLEEP FOR %d\n\n", EVENTS[EVENT_IX].dur);    
 }
-
-
 
 void loop()
 {      
-    sep('#',32);
-    Serial.println("Another loop iteration");
-    Serial.printf("Uptime: %dms\n\n", millis());
+    // sep('#',32);
+    // Serial.println("Another loop iteration");
+    // Serial.printf("Uptime: %dms\n\n", millis());
     led_cycle();
     if (IrReceiver.decode()) {
 
@@ -142,10 +161,11 @@ void loop()
 
         Serial.print("Command: 0x");
         Serial.println(IrReceiver.decodedIRData.command, HEX);
-        
+
         Serial.println();
 
         IrReceiver.resume();
     }
+    refresh_display(clr2cstr(EVENTS[EVENT_IX].color), EVENTS[EVENT_IX].dur);
     delay(50);
 }
