@@ -6,6 +6,9 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <IRremote.hpp>
+
+#define IR_PIN 4
 
 #define R_PIN 16
 #define G_PIN 17
@@ -64,6 +67,9 @@ event EVENTS[CYCLE_LEN] = {
 
 void setup()
 {   
+    IrReceiver.begin(IR_PIN, ENABLE_LED_FEEDBACK);
+
+
     Wire.begin(SDA, SCK);
     if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
         while (true);
@@ -126,4 +132,20 @@ void loop()
     Serial.println("Another loop iteration");
     Serial.printf("Uptime: %dms\n\n", millis());
     led_cycle();
+    if (IrReceiver.decode()) {
+
+        Serial.print("Protocol: ");
+        Serial.println(IrReceiver.decodedIRData.protocol);
+
+        Serial.print("Address: 0x");
+        Serial.println(IrReceiver.decodedIRData.address, HEX);
+
+        Serial.print("Command: 0x");
+        Serial.println(IrReceiver.decodedIRData.command, HEX);
+        
+        Serial.println();
+
+        IrReceiver.resume();
+    }
+    delay(50);
 }
