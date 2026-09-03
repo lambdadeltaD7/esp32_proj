@@ -9,6 +9,10 @@
 #include <IRremote.hpp>
 #include "esp32-hal-cpu.h"
 
+
+#define BUTTON_PIN 23
+
+
 #define IR_PIN 4
 
 #define R_PIN 16
@@ -199,8 +203,9 @@ void print_system_info(){
 
 void setup()
 {   
-    IrReceiver.begin(IR_PIN, ENABLE_LED_FEEDBACK);
+    pinMode(BUTTON_PIN, INPUT_PULLUP);
 
+    IrReceiver.begin(IR_PIN, ENABLE_LED_FEEDBACK);
 
     Wire.begin(SDA, SCK);
     if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
@@ -258,9 +263,23 @@ void display_show_ir_info(){
 }
 
 
+void display_show_button_info(){
+    display.setTextSize(3);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 20);
+    display.println("BTN :3");
+}
+
 void refresh_display(char* curr_clr, int curr_dur){
     // Serial.println("refresh_display()");
     display.clearDisplay();
+
+    if (digitalRead(BUTTON_PIN) == LOW) {
+        Serial.println("Button is pressed");
+        display_show_button_info();
+        display.display();
+        return;
+    }
 
     switch (CURR_DISPLAY_STATE) {
         case DisplayState::LED_INFO:
@@ -270,6 +289,7 @@ void refresh_display(char* curr_clr, int curr_dur){
         case DisplayState::IR_INFO:
             display_show_ir_info();
             break;
+
     }
     
     display.display();
@@ -329,7 +349,7 @@ void handle_key_press(IRKeys key){
 
 
 void loop()
-{      
+{    
     led_cycle();
 
     if (IrReceiver.decode()) {
