@@ -57,7 +57,8 @@ enum class IRKeys{
     kup,
     kdown,
     kleft,
-    kright
+    kright,
+    kERROR
 };
 
 
@@ -78,7 +79,10 @@ char kup_str[8] = "UP";
 char kdown_str[8] = "DOWN";
 char kleft_str[8] = "LEFT";
 char kright_str[8] = "RIGHT";
+char kERROR_str[8] = "ERROR";
 
+IRKeys LAST_PRESSED_KEY = IRKeys::kERROR;
+unsigned long LAST_PRESSED_KEY_TS = 0;
 
 IRKeys cmd2key(uint16_t command){
     switch(command){
@@ -123,6 +127,7 @@ char* key2cstr(IRKeys key){
         case IRKeys::kdown: return kdown_str;
         case IRKeys::kleft: return kleft_str;
         case IRKeys::kright: return kright_str;
+        case IRKeys::kERROR: return kERROR_str;
     }
 }
 
@@ -205,7 +210,20 @@ void display_show_led_info(char* curr_clr, int curr_dur){
 
 
 void display_show_ir_info(){
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 0);
+    display.printf("uptime: %dms", millis());
 
+    display.setTextSize(2);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 16);
+    display.printf("key %s", key2cstr(LAST_PRESSED_KEY));
+
+    display.setTextSize(2);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 40);
+    display.printf("TS %ds", LAST_PRESSED_KEY_TS);
 }
 
 
@@ -241,29 +259,49 @@ void led_cycle(){
 }
 
 
+
+void switch_display_mode(){
+    switch(CURR_DISPLAY_STATE){
+        case DisplayState::IR_INFO:
+            CURR_DISPLAY_STATE = DisplayState::LED_INFO;
+            break;
+
+        case DisplayState::LED_INFO:
+            CURR_DISPLAY_STATE = DisplayState::IR_INFO;
+            break;
+    }
+}
+
+
+void handle_key_press(IRKeys key){
+    switch (key) {
+        case IRKeys::kleft:
+            [[fallthrough]];
+        case IRKeys::kright:
+            switch_display_mode();
+            Serial.println("switching display mode...");
+            return;
+    }
+
+    LAST_PRESSED_KEY = key;
+    LAST_PRESSED_KEY_TS = millis() / 1000; 
+}
+
+
 void loop()
 {      
     led_cycle();
 
     if (IrReceiver.decode()) {
-
-        // Serial.print("Protocol: ");
-        // Serial.println(IrReceiver.decodedIRData.protocol);
-
-        // Serial.print("Address: 0x");
-        // Serial.println(IrReceiver.decodedIRData.address, HEX);
-
-        // Serial.print("Command: 0x");
-        // Serial.println(IrReceiver.decodedIRData.command, HEX);
-
         Serial.print("IRCommand: ");
         Serial.println(IrReceiver.decodedIRData.command);
         Serial.print("IRCommand_str: ");
-        Serial.println(key2cstr(cmd2key(IrReceiver.decodedIRData.command)));
-
+        IRKeys pressed_key = cmd2key(IrReceiver.decodedIRData.command);
+        Serial.println(key2cstr(pressed_key));
         Serial.println();
 
         IrReceiver.resume();
+        handle_key_press(pressed_key);
     }
 
     refresh_display(
