@@ -7,6 +7,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <IRremote.hpp>
+#include "esp32-hal-cpu.h"
 
 #define IR_PIN 4
 
@@ -176,6 +177,26 @@ int EVENT_IX;
 unsigned long EVENT_STARTED_AT;
 
 
+void print_system_info(){
+    Serial.printf("CPU: %d MHz\n", getCpuFrequencyMhz());
+    Serial.printf("Cores: %d\n", ESP.getChipCores());
+    Serial.printf(
+        "[RAM/bytes] Free: %u, Total: %u\n",
+        ESP.getFreeHeap(),
+        ESP.getHeapSize()
+    );
+    float used = 100.0f *
+    (1.0f - (float)ESP.getFreeHeap() / ESP.getHeapSize());
+
+    Serial.printf("RAM used: %.1f%%\n", used);  
+
+    Serial.printf(
+        "FlashTotal: %u bytes\n\n",
+        ESP.getFlashChipSize()
+    );
+}
+
+
 void setup()
 {   
     IrReceiver.begin(IR_PIN, ENABLE_LED_FEEDBACK);
@@ -297,6 +318,9 @@ void handle_key_press(IRKeys key){
             return;
         case IRKeys::kNONE:
             return;
+        case IRKeys::kstar:
+            print_system_info();
+            break;
     }
 
     LAST_PRESSED_KEY = key;
