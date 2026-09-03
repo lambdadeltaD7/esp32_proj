@@ -23,11 +23,111 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 
+struct event{
+    int color;
+    int dur;
+};
+
 char R_CLR_STR[8] = "Red";
 char G_CLR_STR[8] = "Green";
 char B_CLR_STR[8] = "Blue";
 char BAD_CLR__[8]   = "ERROR";
 
+
+enum class DisplayState{
+    LED_INFO,
+    IR_INFO
+};
+
+
+enum class IRKeys{
+    k0,
+    k1,
+    k2,
+    k3,
+    k4,
+    k5,
+    k6,
+    k7,
+    k8,
+    k9,
+    kstar,
+    khash,
+    kok,
+    kup,
+    kdown,
+    kleft,
+    kright
+};
+
+
+char k0_str[8] = "0";
+char k1_str[8] = "1";
+char k2_str[8] = "2";
+char k3_str[8] = "3";
+char k4_str[8] = "4";
+char k5_str[8] = "5";
+char k6_str[8] = "6";
+char k7_str[8] = "7";
+char k8_str[8] = "8";
+char k9_str[8] = "9";
+char kstar_str[8] = "*";
+char khash_str[8] = "#";
+char kok_str[8] = "OK";
+char kup_str[8] = "UP";
+char kdown_str[8] = "DOWN";
+char kleft_str[8] = "LEFT";
+char kright_str[8] = "RIGHT";
+
+
+IRKeys cmd2key(uint16_t command){
+    switch(command){
+        case 25: return IRKeys::k0;
+        case 69: return IRKeys::k1;
+        case 70: return IRKeys::k2;
+        case 71: return IRKeys::k3;
+        case 68: return IRKeys::k4;
+        case 64: return IRKeys::k5;
+        case 67: return IRKeys::k6;
+        case 7: return IRKeys::k7;
+        case 21: return IRKeys::k8;
+        case 9: return IRKeys::k9;
+        case 22: return IRKeys::kstar;
+        case 13: return IRKeys::khash;
+        case 28: return IRKeys::kok;
+        case 24: return IRKeys::kup;
+        case 82: return IRKeys::kdown;
+        case 8: return IRKeys::kleft;
+        case 90: return IRKeys::kright;
+    }
+} 
+
+
+
+char* key2cstr(IRKeys key){
+    switch(key){
+        case IRKeys::k0: return k0_str;
+        case IRKeys::k1: return k1_str;
+        case IRKeys::k2: return k2_str;
+        case IRKeys::k3: return k3_str;
+        case IRKeys::k4: return k4_str;
+        case IRKeys::k5: return k5_str;
+        case IRKeys::k6: return k6_str;
+        case IRKeys::k7: return k7_str;
+        case IRKeys::k8: return k8_str;
+        case IRKeys::k9: return k9_str;
+        case IRKeys::kstar: return kstar_str;
+        case IRKeys::khash: return khash_str;
+        case IRKeys::kok: return kok_str;
+        case IRKeys::kup: return kup_str;
+        case IRKeys::kdown: return kdown_str;
+        case IRKeys::kleft: return kleft_str;
+        case IRKeys::kright: return kright_str;
+    }
+}
+
+
+DisplayState CURR_DISPLAY_STATE = DisplayState::LED_INFO;
 
 inline void sep(char c, int n){
     for(int i=0; i<n; ++i){
@@ -50,11 +150,6 @@ char* clr2cstr(int clr){
 }
 
 
-struct event{
-    int color;
-    int dur;
-};
-
 const int CYCLE_LEN = 6;
 event EVENTS[CYCLE_LEN] = {
     {R_PIN, 1000},
@@ -66,6 +161,7 @@ event EVENTS[CYCLE_LEN] = {
 };
 int EVENT_IX;
 unsigned long EVENT_STARTED_AT;
+
 
 void setup()
 {   
@@ -90,9 +186,7 @@ void setup()
 }
 
 
-void refresh_display(char* curr_clr, int curr_dur){
-    display.clearDisplay();
-
+void display_show_led_info(char* curr_clr, int curr_dur){
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(0, 0);
@@ -107,28 +201,29 @@ void refresh_display(char* curr_clr, int curr_dur){
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(0, 40);
     display.printf("dur %dms", curr_dur);
-
-    display.display();
 }
 
 
-// void led_cycle(){
-//     Serial.println("Entered led_cycle\n");
-//     for(int i=0; i<CYCLE_LEN; ++i){
-//         Serial.printf("    cycle iteration %d/%d\n", i+1, CYCLE_LEN);
-//         if(PREV_ACTIVE != -1){
-//             digitalWrite(PREV_ACTIVE, LOW);
-//         }
-//         Serial.printf("    KILLED %s\n", clr2cstr(PREV_ACTIVE));
-//         digitalWrite(EVENTS[i].color, HIGH);
-//         Serial.printf("    STARTED %s\n", clr2cstr(EVENTS[i].color));
-//         Serial.printf("    SLEEP FOR %d\n\n", EVENTS[i].dur);
-//         PREV_ACTIVE = EVENTS[i].color;
-//         refresh_display(clr2cstr(EVENTS[i].color), EVENTS[i].dur);
-//         delay(EVENTS[i].dur);
-//     }
-//     Serial.println("Exited led_cycle\n\n");
-// }
+void display_show_ir_info(){
+
+}
+
+
+void refresh_display(char* curr_clr, int curr_dur){
+    display.clearDisplay();
+
+    switch (CURR_DISPLAY_STATE) {
+        case DisplayState::LED_INFO:
+            display_show_led_info(curr_clr, curr_dur);
+            break;
+
+        case DisplayState::IR_INFO:
+            display_show_ir_info();
+            break;
+    }
+    
+    display.display();
+}
 
 
 void led_cycle(){
@@ -145,27 +240,36 @@ void led_cycle(){
     Serial.printf("    SLEEP FOR %d\n\n", EVENTS[EVENT_IX].dur);    
 }
 
+
 void loop()
 {      
-    // sep('#',32);
-    // Serial.println("Another loop iteration");
-    // Serial.printf("Uptime: %dms\n\n", millis());
     led_cycle();
+
     if (IrReceiver.decode()) {
 
-        Serial.print("Protocol: ");
-        Serial.println(IrReceiver.decodedIRData.protocol);
+        // Serial.print("Protocol: ");
+        // Serial.println(IrReceiver.decodedIRData.protocol);
 
-        Serial.print("Address: 0x");
-        Serial.println(IrReceiver.decodedIRData.address, HEX);
+        // Serial.print("Address: 0x");
+        // Serial.println(IrReceiver.decodedIRData.address, HEX);
 
-        Serial.print("Command: 0x");
-        Serial.println(IrReceiver.decodedIRData.command, HEX);
+        // Serial.print("Command: 0x");
+        // Serial.println(IrReceiver.decodedIRData.command, HEX);
+
+        Serial.print("IRCommand: ");
+        Serial.println(IrReceiver.decodedIRData.command);
+        Serial.print("IRCommand_str: ");
+        Serial.println(key2cstr(cmd2key(IrReceiver.decodedIRData.command)));
 
         Serial.println();
 
         IrReceiver.resume();
     }
-    refresh_display(clr2cstr(EVENTS[EVENT_IX].color), EVENTS[EVENT_IX].dur);
+
+    refresh_display(
+        clr2cstr(EVENTS[EVENT_IX].color),
+        EVENTS[EVENT_IX].dur
+    );
+
     delay(50);
 }
