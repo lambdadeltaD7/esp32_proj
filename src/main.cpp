@@ -162,6 +162,14 @@ char* key2cstr(IRKeys key){
 
 DisplayState CURR_DISPLAY_STATE = DisplayState::LED_INFO;
 
+void display_render_uptime(){
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 0);
+    display.printf("uptime: %dms", millis());
+}
+
+
 inline void sep(char c, int n){
     for(int i=0; i<n; ++i){
         Serial.print(c);
@@ -197,9 +205,61 @@ int EVENT_IX;
 unsigned long EVENT_STARTED_AT;
 
 
+const int HardwareInfoLen = 4;
+enum class HardwareInfo{
+    cpu_mhz,
+    cores,
+    ram,
+    flash
+};
+
+
+void render_hardware_detail(HardwareInfo hi){
+    
+    display.setTextColor(SSD1306_WHITE);
+
+    float used = 100.0f * (1.0f - (float)ESP.getFreeHeap() / ESP.getHeapSize());
+
+    switch(hi){
+        case HardwareInfo::cpu_mhz:
+            display.setTextSize(2);
+            display.setCursor(0, 17);
+            display.printf("CPU:\n%d MHz\n", getCpuFrequencyMhz());
+            break;
+
+        case HardwareInfo::cores:
+            display.setTextSize(2);
+            display.setCursor(0, 17);
+            display.printf("Cores: %d\n", ESP.getChipCores());
+            break;
+
+        case HardwareInfo::ram:
+            display.setTextSize(1);
+            display.setCursor(0, 17);
+            display.printf(
+                " RAM (bytes)\n Free: %u\n Total: %u\n Used: %.1f%%",
+                ESP.getFreeHeap(),
+                ESP.getHeapSize(),
+                used
+            );
+            break;
+        
+        case HardwareInfo::flash:
+            display.setTextSize(2);
+            display.setCursor(0, 17);
+            display.printf(
+                "FlashTotal\n%ub\n\n",
+                ESP.getFlashChipSize()
+            );
+            break;
+    }
+
+}
+
 void print_system_info(){
     Serial.printf("CPU: %d MHz\n", getCpuFrequencyMhz());
     Serial.printf("Cores: %d\n", ESP.getChipCores());
+
     Serial.printf(
         "[RAM/bytes] Free: %u, Total: %u\n",
         ESP.getFreeHeap(),
@@ -207,7 +267,6 @@ void print_system_info(){
     );
     float used = 100.0f *
     (1.0f - (float)ESP.getFreeHeap() / ESP.getHeapSize());
-
     Serial.printf("RAM used: %.1f%%\n", used);  
 
     Serial.printf(
@@ -242,12 +301,7 @@ void setup()
 
 
 
-void display_render_uptime(){
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(0, 0);
-    display.printf("uptime: %dms", millis());
-}
+
 
 
 void display_show_led_info(char* curr_clr, int curr_dur){
@@ -344,7 +398,6 @@ void led_cycle(){
 }
 
 
-
 IRKeys get_key_from_ir(){
     IRKeys pressed_key = IRKeys::kNONE;
 
@@ -363,8 +416,76 @@ IRKeys get_key_from_ir(){
 }
 
 
-void start_list_hardware_info(){
+bool list_hardware_handle_key(IRKeys pressed_key, HardwareInfo &choosen_state){
+    /*
+    exit if list_hardware_handle_key() == true;
+    */
 
+    switch(pressed_key){
+        case IRKeys::kleft:
+            if(static_cast<int>(choosen_state) == 0){
+                choosen_state = static_cast<HardwareInfo>(
+                    HardwareInfoLen - 1
+                );
+            }
+            else{
+                choosen_state = static_cast<HardwareInfo>(
+                    static_cast<int>(choosen_state) - 1
+                );
+            }
+            break;
+
+        case IRKeys::kright:
+            choosen_state = static_cast<HardwareInfo>(
+                (static_cast<int>(choosen_state) + 1) % HardwareInfoLen
+            );
+            break;
+
+        case IRKeys::kok:
+            return true;
+            break;
+
+        default:
+            break;
+    }
+
+    return false;
+}
+
+
+void render_hardware_nav_hint(){
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 55);
+    display.println("use L/R/OK 4 nav");
+}
+
+void start_list_hardware_info(){
+    HardwareInfo choosen_state = HardwareInfo::ram;
+
+    Serial.println("start_list_hardware_info()");
+
+    while(1){
+        display.clearDisplay();
+
+        display_render_uptime();
+
+        render_hardware_detail(choosen_state);
+
+        render_hardware_nav_hint();
+
+        display.display();
+
+        IRKeys pressed_key = get_key_from_ir();
+        
+        bool pressed_ok = list_hardware_handle_key(pressed_key, choosen_state);
+
+        if(pressed_ok){
+            return;
+        }
+
+        delay(LOOP_SLEEP_TIME_MS);
+    }
 }
 
 
@@ -404,6 +525,7 @@ bool choose_display_state_handle_key(IRKeys pressed_key, DisplayState& choosen_s
 
     return false;
 }
+
 
 void start_choose_display_state_dialog(){
     DisplayState choosen_state = CURR_DISPLAY_STATE;
@@ -460,9 +582,6 @@ void handle_key_press(IRKeys key){
     LAST_PRESSED_KEY = key;
     LAST_PRESSED_KEY_TS = millis() / 1000; 
 }
-
-
-
 
 
 void loop()
