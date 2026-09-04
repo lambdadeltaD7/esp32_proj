@@ -10,6 +10,9 @@
 #include "esp32-hal-cpu.h"
 
 
+
+#define LOOP_SLEEP_TIME_MS 50 
+
 #define BUTTON_PIN 23
 
 
@@ -18,7 +21,6 @@
 #define R_PIN 16
 #define G_PIN 17
 #define B_PIN 18
-// int PREV_ACTIVE = -1;
 
 
 #define SCREEN_WIDTH 128
@@ -39,11 +41,21 @@ char B_CLR_STR[8] = "Blue";
 char BAD_CLR__[8]   = "ERROR";
 
 
+const int CNT_DISPLAY_STATES = 2;
 enum class DisplayState{
     LED_INFO,
     IR_INFO
 };
 
+char DISPLAY_LED_INFO[16] = "LED_INFO_MODE";
+char DISPLAY_IR_INFO[16] = "IR_INFO_MODE";
+
+char* DisplayState2cstr(DisplayState ds){
+    switch(ds){
+        case DisplayState::LED_INFO: return DISPLAY_LED_INFO;
+        case DisplayState::IR_INFO: return DISPLAY_IR_INFO;
+    }
+}
 
 enum class IRKeys{
     k0,
@@ -225,12 +237,18 @@ void setup()
 }
 
 
-void display_show_led_info(char* curr_clr, int curr_dur){
-    // Serial.println("display_show_led_info()");
+
+void display_render_uptime(){
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(0, 0);
     display.printf("uptime: %dms", millis());
+}
+
+
+void display_show_led_info(char* curr_clr, int curr_dur){
+    // Serial.println("display_show_led_info()");
+    display_render_uptime();
 
     display.setTextSize(2);
     display.setTextColor(SSD1306_WHITE);
@@ -246,10 +264,7 @@ void display_show_led_info(char* curr_clr, int curr_dur){
 
 void display_show_ir_info(){
     // Serial.println("display_show_ir_info()");
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(0, 0);
-    display.printf("uptime: %dms", millis());
+    display_render_uptime();
 
     display.setTextSize(2);
     display.setTextColor(SSD1306_WHITE);
@@ -313,16 +328,100 @@ void led_cycle(){
 
 
 
-void switch_display_mode(){
-    // Serial.println("switch_display_mode()");
-    switch(CURR_DISPLAY_STATE){
-        case DisplayState::IR_INFO:
-            CURR_DISPLAY_STATE = DisplayState::LED_INFO;
+IRKeys get_key_from_ir(){
+    IRKeys pressed_key = IRKeys::kNONE;
+
+    if (IrReceiver.decode()) {
+        Serial.print("IRCommand: ");
+        Serial.println(IrReceiver.decodedIRData.command);
+        Serial.print("IRCommand_str: ");
+        pressed_key = cmd2key(IrReceiver.decodedIRData.command);
+        Serial.println(key2cstr(pressed_key));
+        Serial.println();
+
+        IrReceiver.resume();
+    }
+
+    return pressed_key;
+}
+
+
+void start_list_hardware_info(){
+
+}
+
+
+bool choose_display_state_handle_key(IRKeys pressed_key, DisplayState& choosen_state){
+    /*
+    exit if choose_display_state_handle_key() == true;
+    */
+
+    switch(pressed_key){
+        case IRKeys::kup:
+            if(static_cast<int>(choosen_state) == 0){
+                choosen_state = static_cast<DisplayState>(
+                    CNT_DISPLAY_STATES - 1
+                );
+            }
+            else{
+                choosen_state = static_cast<DisplayState>(
+                    static_cast<int>(choosen_state) - 1
+                );
+            }
             break;
 
-        case DisplayState::LED_INFO:
-            CURR_DISPLAY_STATE = DisplayState::IR_INFO;
+        case IRKeys::kdown:
+            choosen_state = static_cast<DisplayState>(
+                (static_cast<int>(choosen_state) + 1) % CNT_DISPLAY_STATES
+            );
             break;
+
+        case IRKeys::kok:
+            CURR_DISPLAY_STATE = choosen_state;
+            return true;
+            break;
+
+        default:
+            break;
+    }
+
+    return false;
+}
+
+void start_choose_display_state_dialog(){
+    DisplayState choosen_state = CURR_DISPLAY_STATE;
+    int menu_offset = 20;
+    int menu_line_size = 10;
+
+    Serial.println("start_choose_display_state_dialog()");
+
+    while(1){
+        display.clearDisplay();
+
+        display_render_uptime();
+
+        display.setTextSize(1);
+        display.setTextColor(SSD1306_WHITE);
+
+        for(int i=0; i<CNT_DISPLAY_STATES; ++i){
+            display.setCursor(0, menu_offset + i * menu_line_size);
+            if(i == static_cast<int>(choosen_state)){
+                display.print(" ->");
+            }
+            display.printf(" %s", DisplayState2cstr(static_cast<DisplayState>(i)));
+        }
+
+        display.display();
+
+        IRKeys pressed_key = get_key_from_ir();
+        
+        bool pressed_ok = choose_display_state_handle_key(pressed_key, choosen_state);
+
+        if(pressed_ok){
+            return;
+        }
+
+        delay(LOOP_SLEEP_TIME_MS);
     }
 }
 
@@ -330,16 +429,14 @@ void switch_display_mode(){
 void handle_key_press(IRKeys key){
     // Serial.println("handle_key_press()");
     switch (key) {
-        case IRKeys::kleft:
-            [[fallthrough]];
-        case IRKeys::kright:
-            switch_display_mode();
-            Serial.println("switching display mode...");
-            return;
         case IRKeys::kNONE:
             return;
-        case IRKeys::kstar:
+        case IRKeys::khash:
             print_system_info();
+            start_list_hardware_info();
+            break;
+        case IRKeys::kstar:
+            start_choose_display_state_dialog();
             break;
     }
 
@@ -348,26 +445,20 @@ void handle_key_press(IRKeys key){
 }
 
 
+
+
+
 void loop()
 {    
     led_cycle();
 
-    if (IrReceiver.decode()) {
-        Serial.print("IRCommand: ");
-        Serial.println(IrReceiver.decodedIRData.command);
-        Serial.print("IRCommand_str: ");
-        IRKeys pressed_key = cmd2key(IrReceiver.decodedIRData.command);
-        Serial.println(key2cstr(pressed_key));
-        Serial.println();
-
-        IrReceiver.resume();
-        handle_key_press(pressed_key);
-    }
+    IRKeys pressed_key = get_key_from_ir();
+    handle_key_press(pressed_key);
 
     refresh_display(
         clr2cstr(EVENTS[EVENT_IX].color),
         EVENTS[EVENT_IX].dur
     );
 
-    delay(50);
+    delay(LOOP_SLEEP_TIME_MS);
 }
