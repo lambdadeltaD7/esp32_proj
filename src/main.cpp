@@ -41,19 +41,23 @@ char B_CLR_STR[8] = "Blue";
 char BAD_CLR__[8]   = "ERROR";
 
 
-const int CNT_DISPLAY_STATES = 2;
+const int CNT_DISPLAY_STATES = 3;
 enum class DisplayState{
     LED_INFO,
-    IR_INFO
+    IR_INFO,
+    STATIC
 };
 
 char DISPLAY_LED_INFO[16] = "LED_INFO_MODE";
 char DISPLAY_IR_INFO[16] = "IR_INFO_MODE";
+char DISPLAY_STATIC[16] = "STATIC_MODE";
+
 
 char* DisplayState2cstr(DisplayState ds){
     switch(ds){
         case DisplayState::LED_INFO: return DISPLAY_LED_INFO;
         case DisplayState::IR_INFO: return DISPLAY_IR_INFO;
+        case DisplayState::STATIC: return DISPLAY_STATIC;
     }
 }
 
@@ -285,6 +289,15 @@ void display_show_button_info(){
     display.println("BTN :3");
 }
 
+
+void display_show_static(){
+    display.setTextSize(2);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(4, 24);
+    display.println("Lambda :3");
+}
+
+
 void refresh_display(char* curr_clr, int curr_dur){
     // Serial.println("refresh_display()");
     display.clearDisplay();
@@ -303,6 +316,10 @@ void refresh_display(char* curr_clr, int curr_dur){
 
         case DisplayState::IR_INFO:
             display_show_ir_info();
+            break;
+
+        case DisplayState::STATIC:
+            display_show_static();
             break;
 
     }
